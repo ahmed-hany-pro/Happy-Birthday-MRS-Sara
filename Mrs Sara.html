@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Happy Birthday MRS Sara</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Playfair+Display:wght@700&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      overflow: hidden;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      position: relative;
+      font-family: "Playfair Display", serif;
+    }
+
+    canvas {
+      display: block;
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stars {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .star {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      animation: twinkle 3s infinite;
+      will-change: transform, opacity;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: .3; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
+    .glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: clamp(220px, 40vw, 600px);
+      height: clamp(220px, 40vw, 600px);
+      background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      animation: pulse 4s ease-in-out infinite;
+      border-radius: 50%;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .5; }
+      50% { transform: translate(-50%, -50%) scale(1.15); opacity: .85; }
+    }
+
+    @media (max-width: 420px) {
+      .glow {
+        opacity: .9;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stars" id="stars"></div>
+  <div class="glow" id="glow"></div>
+  <canvas id="c" aria-hidden="true"></canvas>
+
+  <script>
+    (function () {
+      // DOM
+      const canvas = document.getElementById('c');
+      const starsContainer = document.getElementById('stars');
+
+      // Context and size
+      let ctx, w, h, hw, hh, dpr;
+
+      // Base options
+      const baseOpts = {
+        strings: ['HAPPY', 'BIRTHDAY!', 'MRS Sara'],
+        charSize: 40,
+        charSpacing: 45,
+        lineHeight: 60,
+        fireworkPrevPoints: 30,
+        fireworkBaseLineWidth: 5,
+        fireworkAddedLineWidth: 8,
+        fireworkSpawnTime: 100,
+        fireworkBaseReachTime: 100,
+        fireworkAddedReachTime: 20,
+        fireworkCircleBaseSize: 30,
+        fireworkCircleAddedSize: 15,
+        fireworkCircleBaseTime: 25,
+        fireworkCircleAddedTime: 15,
+        fireworkCircleFadeBaseTime: 15,
+        fireworkCircleFadeAddedTime: 8,
+        fireworkBaseShards: 8,
+        fireworkAddedShards: 6,
+        fireworkShardPrevPoints: 10,
+        fireworkShardBaseVel: 5,
+        fireworkShardAddedVel: 3,
+        fireworkShardBaseSize: 2,
+        fireworkShardAddedSize: 2,
+        gravity: .15,
+        upFlow: -.12,
+        letterContemplatingWaitTime: 200,
+        balloonSpawnTime: 25,
+        balloonBaseInflateTime: 20,
+        balloonAddedInflateTime: 15,
+        balloonBaseSize: 30,
+        balloonAddedSize: 15,
+        balloonBaseVel: .5,
+        balloonAddedVel: .5,
+        balloonBaseRadian: -(Math.PI / 2 - .5),
+        balloonAddedRadian: -1,
+      };
+
+      // Runtime state
+      let opts = Object.assign({}, baseOpts);
+      let calc = { totalWidth: 0 };
+      let letters = [];
+      let particleExplosions = [];
+      let starsCount = 100;
+
+      // === Utilities ===
+      function adaptForSize() {
+        const width = window.innerWidth;
+        if (width <= 420) {
+          opts.charSize = 28;
+          opts.charSpacing = 34;
+          opts.lineHeight = 48;
+          opts.balloonBaseSize = 22;
+          opts.balloonAddedSize = 12;
+          opts.fireworkCircleBaseSize = 20;
+          starsCount = 60;
+        } else if (width <= 768) {
+          opts.charSize = 36;
+          opts.charSpacing = 40;
+          opts.lineHeight = 56;
+          opts.balloonBaseSize = 26;
+          opts.balloonAddedSize = 14;
+          opts.fireworkCircleBaseSize = 26;
+          starsCount = 80;
+        } else {
+          opts = Object.assign({}, baseOpts, { strings: baseOpts.strings });
+          starsCount = 100;
+        }
+      }
+
+      // Starfield
+      function createStars(count) {
+        starsContainer.innerHTML = '';
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < count; i++) {
+          const star = document.createElement('div');
+          star.className = 'star';
+          const left = Math.random() * 100;
+          const top = Math.random() * 100;
+          const size = (Math.random() * 3 + 0.8) * (window.innerWidth <= 420 ? 0.9 : 1);
+          star.style.left = left + '%';
+          star.style.top = top + '%';
+          star.style.width = star.style.height = size + 'px';
+          star.style.animationDelay = (Math.random() * 3) + 's';
+          star.style.opacity = (0.4 + Math.random() * 0.6).toString();
+          frag.appendChild(star);
+        }
+        starsContainer.appendChild(frag);
+      }
+
+      // DPR-aware resize
+      function resize() {
+        dpr = Math.max(1, window.devicePixelRatio || 1);
+        w = Math.max(300, Math.floor(window.innerWidth));
+        h = Math.max(300, Math.floor(window.innerHeight));
+        hw = w / 2;
+        hh = h / 2;
+
+        adaptForSize();
+
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
+
+        ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.font = 'bold ' + opts.charSize + 'px "Playfair Display", serif';
+
+        createLetters();
+        createStars(starsCount);
+      }
+
+      // === Color helpers ===
+      function hsl(h, s, l) {
+        return `hsl(${h}, ${s}%, ${l}%)`;
+      }
+
+      function hsla(h, s, l, a) {
+        return `hsla(${h}, ${s}%, ${l}%, ${a})`;
+      }
+
+      // === Letter class ===
+      function Letter(char, x, y) {
+        this.char = char;
+        this.x = x;
+        this.y = y;
+        this.dx = -ctx.measureText(char).width / 2;
+        this.dy = +opts.charSize / 2;
+        this.fireworkDy = this.y - hh;
+
+        const hue = ((x + (calc.totalWidth / 2)) / Math.max(calc.totalWidth, 1)) * 360;
+        this.hue = Math.round(hue);
+        this.color = hsl(this.hue, 90, 60);
+        this.lightColor = hsl(this.hue, 90, 95);
+        this.alphaColor = (a) => hsla(this.hue, 90, 65, a);
+        this.lightAlphaColor = (a) => hsla(this.hue, 90, 95, a);
+
+        this.reset();
+      }
+
+      Letter.prototype.reset = function () {
+        this.phase = 'firework';
+        this.tick = 0;
+        this.spawned = false;
+        this.spawningTime = Math.floor(opts.fireworkSpawnTime * Math.random());
+        this.reachTime = Math.floor(opts.fireworkBaseReachTime + opts.fireworkAddedReachTime * Math.random());
+        this.lineWidth = opts.fireworkBaseLineWidth + opts.fireworkAddedLineWidth * Math.random();
+        this.prevPoints = [[0, hh, 0]];
+      };
+
+      Letter.prototype.step = function () {
+        if (this.phase === 'firework') {
+          if (!this.spawned) {
+            ++this.tick;
+            if (this.tick >= this.spawningTime) {
+              this.tick = 0;
+              this.spawned = true;
+            }
+          } else {
+            ++this.tick;
+            const linearProportion = this.tick / this.reachTime;
+            const armonicProportion = Math.sin(linearProportion * Math.PI / 2);
+            const x = linearProportion * this.x;
+            const y = hh + armonicProportion * this.fireworkDy;
+
+            if (this.prevPoints.length > opts.fireworkPrevPoints) this.prevPoints.shift();
+            this.prevPoints.push([x, y, linearProportion * this.lineWidth]);
+
+            const lineWidthProportion = 1 / (this.prevPoints.length - 1 || 1);
+            for (let i = 1; i < this.prevPoints.length; ++i) {
+              const point = this.prevPoints[i];
+              const point2 = this.prevPoints[i - 1];
+
+              ctx.strokeStyle = this.alphaColor((i / this.prevPoints.length).toFixed(2));
+              ctx.lineWidth = point[2] * lineWidthProportion * i;
+              ctx.beginPath();
+              ctx.moveTo(point[0], point[1]);
+              ctx.lineTo(point2[0], point2[1]);
+              ctx.save();
+              ctx.shadowBlur = 15;
+              ctx.shadowColor = this.color;
+              ctx.stroke();
+              ctx.restore();
+            }
+
+            if (this.tick >= this.reachTime) {
+              this.phase = 'contemplate';
+              this.circleFinalSize = opts.fireworkCircleBaseSize + opts.fireworkCircleAddedSize * Math.random();
+              this.circleCompleteTime = Math.floor(opts.fireworkCircleBaseTime + opts.fireworkCircleAddedTime * Math.random());
+              this.circleCreating = true;
+              this.circleFading = false;
+              this.circleFadeTime = Math.floor(opts.fireworkCircleFadeBaseTime + opts.fireworkCircleFadeAddedTime * Math.random());
+              this.tick = 0;
+              this.tick2 = 0;
+              this.shards = [];
+
+              const shardCount = Math.floor(opts.fireworkBaseShards + opts.fireworkAddedShards * Math.random());
+              const angle = (Math.PI * 2) / shardCount;
+              const cos = Math.cos(angle);
+              const sin = Math.sin(angle);
+              let vx = 1, vy = 0;
+
+              for (let i = 0; i < shardCount; ++i) {
+                const nx = vx * cos - vy * sin;
+                vy = vx * sin + vy * cos;
+                vx = nx;
+                this.shards.push(new Shard(this.x, this.y, vx, vy, this.alphaColor));
+              }
+            }
+          }
+        } else if (this.phase === 'contemplate') {
+          ++this.tick;
+
+          if (this.circleCreating) {
+            ++this.tick2;
+            const proportion = this.tick2 / this.circleCompleteTime;
+            const armonic = -Math.cos(proportion * Math.PI) / 2 + .5;
+
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+            ctx.beginPath();
+            ctx.fillStyle = this.lightAlphaColor(0.5 * proportion + 0.1);
+            ctx.arc(this.x, this.y, armonic * this.circleFinalSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            if (this.tick2 > this.circleCompleteTime) {
+              this.tick2 = 0;
+              this.circleCreating = false;
+              this.circleFading = true;
+            }
+          } else if (this.circleFading) {
+            ctx.save();
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.lightColor;
+            ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
+            ctx.restore();
+
+            ++this.tick2;
+            const proportion = this.tick2 / this.circleFadeTime;
+            const armonic = -Math.cos(proportion * Math.PI) / 2 + .5;
+
+            ctx.beginPath();
+            ctx.fillStyle = this.lightAlphaColor(1 - armonic);
+            ctx.arc(this.x, this.y, this.circleFinalSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (this.tick2 >= this.circleFadeTime) this.circleFading = false;
+          } else {
+            ctx.save();
+            ctx.shadowBlur = 25;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.lightColor;
+            ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
+            ctx.restore();
+          }
+
+          for (let i = 0; i < this.shards.length; ++i) {
+            this.shards[i].step();
+            if (!this.shards[i].alive) {
+              this.shards.splice(i, 1);
+              --i;
+            }
+          }
+
+          if (this.tick > opts.letterContemplatingWaitTime) {
+            this.phase = 'balloon';
+            this.tick = 0;
+            this.spawning = true;
+            this.spawnTime = Math.floor(opts.balloonSpawnTime * Math.random());
+            this.inflating = false;
+            this.inflateTime = Math.floor(opts.balloonBaseInflateTime + opts.balloonAddedInflateTime * Math.random());
+            this.size = Math.floor(opts.balloonBaseSize + opts.balloonAddedSize * Math.random());
+
+            const rad = opts.balloonBaseRadian + opts.balloonAddedRadian * Math.random();
+            const vel = opts.balloonBaseVel + opts.balloonAddedVel * Math.random();
+            this.vx = Math.cos(rad) * vel;
+            this.vy = Math.sin(rad) * vel;
+          }
+        } else if (this.phase === 'balloon') {
+          ctx.strokeStyle = this.lightColor;
+
+          if (this.spawning) {
+            ++this.tick;
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.lightColor;
+            ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
+            ctx.restore();
+
+            if (this.tick >= this.spawnTime) {
+              this.tick = 0;
+              this.spawning = false;
+              this.inflating = true;
+            }
+          } else if (this.inflating) {
+            ++this.tick;
+            const proportion = this.tick / this.inflateTime;
+            const x = this.cx = this.x;
+            const y = this.cy = this.y - this.size * proportion;
+
+            ctx.save();
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.alphaColor(proportion);
+            ctx.beginPath();
+            generateBalloonPath(x, y, this.size * proportion);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, this.y);
+            ctx.stroke();
+
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.lightColor;
+            ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
+            ctx.restore();
+
+            if (this.tick >= this.inflateTime) {
+              this.tick = 0;
+              this.inflating = false;
+            }
+          } else {
+            this.cx += this.vx;
+            this.cy += this.vy += opts.upFlow;
+
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            generateBalloonPath(this.cx, this.cy, this.size);
+            ctx.fill();
+            ctx.restore();
+
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(this.cx, this.cy);
+            ctx.lineTo(this.cx, this.cy + this.size);
+            ctx.stroke();
+
+            ctx.save();
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = this.color;
+            ctx.fillStyle = this.lightColor;
+            ctx.fillText(this.char, this.cx + this.dx, this.cy + this.dy + this.size);
+            ctx.restore();
+
+            if (this.cy + this.size < -hh || this.cx < -hw || this.cy > hw) this.phase = 'done';
+          }
+        }
+      };
+
+      // === Shard class ===
+      function Shard(x, y, vx, vy, colorFn) {
+        const vel = opts.fireworkShardBaseVel + opts.fireworkShardAddedVel * Math.random();
+        this.vx = vx * vel;
+        this.vy = vy * vel;
+        this.x = x;
+        this.y = y;
+        this.prevPoints = [[x, y]];
+        this.colorFn = colorFn;
+        this.alive = true;
+        this.size = opts.fireworkShardBaseSize + opts.fireworkShardAddedSize * Math.random();
+      }
+
+      Shard.prototype.step = function () {
+        this.x += this.vx;
+        this.y += this.vy += opts.gravity;
+
+        if (this.prevPoints.length > opts.fireworkShardPrevPoints) this.prevPoints.shift();
+        this.prevPoints.push([this.x, this.y]);
+
+        const lineWidthProportion = this.size / (this.prevPoints.length || 1);
+        for (let k = 0; k < this.prevPoints.length - 1; ++k) {
+          const point = this.prevPoints[k];
+          const point2 = this.prevPoints[k + 1];
+
+          ctx.strokeStyle = this.colorFn((k / this.prevPoints.length).toFixed(2));
+          ctx.lineWidth = k * lineWidthProportion;
+          ctx.beginPath();
+          ctx.moveTo(point[0], point[1]);
+          ctx.lineTo(point2[0], point2[1]);
+          ctx.stroke();
+        }
+
+        if (this.prevPoints[0][1] > hh + 100) this.alive = false;
+      };
+
+      function generateBalloonPath(x, y, size) {
+        ctx.moveTo(x, y);
+        ctx.bezierCurveTo(x - size / 2, y - size / 2, x - size / 4, y - size, x, y - size);
+        ctx.bezierCurveTo(x + size / 4, y - size, x + size / 2, y - size / 2, x, y);
+      }
+
+      function createLetters() {
+        letters = [];
+        const longest = Math.max(...opts.strings.map(s => s.length));
+        calc.totalWidth = opts.charSpacing * longest;
+
+        for (let i = 0; i < opts.strings.length; ++i) {
+          const s = opts.strings[i];
+          for (let j = 0; j < s.length; ++j) {
+            const x = (j - (s.length - 1) / 2) * opts.charSpacing;
+            const y = (i - (opts.strings.length - 1) / 2) * opts.lineHeight;
+            letters.push(new Letter(s[j], x, y));
+          }
+        }
+      }
+
+      // === Particle Explosion (optimized) ===
+      class ParticleExplosion {
+        constructor(x, y, color_rgb = null) {
+          this.x = x;
+          this.y = y;
+          this.particles = [];
+          this.create(color_rgb);
+        }
+
+        create(color_rgb) {
+          const count = 40; // Reduced from 80
+          for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count;
+            const speed = Math.random() * 5 + 2;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+            const radius = Math.random() * 2 + 0.8;
+            const r = Math.floor(Math.random() * 255);
+            const g = Math.floor(Math.random() * 255);
+            const b = Math.floor(Math.random() * 255);
+            this.particles.push({
+              x: this.x,
+              y: this.y,
+              vx,
+              vy,
+              alpha: 1,
+              radius,
+              rgb: color_rgb || `${r},${g},${b}`
+            });
+          }
+        }
+
+        update() {
+          for (let p of this.particles) {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.05;
+            p.alpha -= 0.035; // Faster fade
+          }
+          this.particles = this.particles.filter(p => p.alpha > 0.01);
+        }
+
+        draw(ctx) {
+          ctx.save();
+          for (let p of this.particles) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${p.rgb}, ${p.alpha})`;
+            ctx.shadowBlur = 6; // Reduced shadow
+            ctx.shadowColor = `rgb(${p.rgb})`;
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        isAlive() {
+          return this.particles.length > 0;
+        }
+      }
+
+      function spawnExplosion(clientX, clientY) {
+        // Limit to 5 active explosions max
+        if (particleExplosions.length >= 5) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        particleExplosions.push(new ParticleExplosion(x, y));
+      }
+
+      // === Animation loop ===
+      function anim() {
+        window.requestAnimationFrame(anim);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(hw, hh);
+
+        let done = true;
+        for (let l = 0; l < letters.length; ++l) {
+          letters[l].step();
+          if (letters[l].phase !== 'done') done = false;
+        }
+
+        ctx.restore();
+
+        // Update and draw particle explosions
+        for (let i = 0; i < particleExplosions.length; ++i) {
+          particleExplosions[i].update();
+          particleExplosions[i].draw(ctx);
+          if (!particleExplosions[i].isAlive()) {
+            particleExplosions.splice(i, 1);
+            --i;
+          }
+        }
+
+        if (done) {
+          for (let l = 0; l < letters.length; ++l) letters[l].reset();
+        }
+      }
+
+      // === Event handlers ===
+      canvas.addEventListener('click', (e) => {
+        spawnExplosion(e.clientX, e.clientY);
+      });
+
+      canvas.addEventListener('touchstart', (e) => {
+        for (let t = 0; t < e.touches.length; t++) {
+          const touch = e.touches[t];
+          spawnExplosion(touch.clientX, touch.clientY);
+        }
+        e.preventDefault();
+      }, { passive: false });
+
+      // === Initialize ===
+      function init() {
+        resize();
+        anim();
+        window.addEventListener('resize', resize);
+        window.addEventListener('orientationchange', () => {
+          setTimeout(resize, 150);
+        });
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
