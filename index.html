@@ -7,7 +7,17 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pacifico&family=Playfair+Display:wght@700&display=swap');
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        
         html, body { height: 100%; }
 
         body {
@@ -15,6 +25,7 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
             position: relative;
             font-family: "Playfair Display", serif;
+            cursor: default;
         }
 
         canvas {
@@ -25,8 +36,7 @@
 
         .stars {
             position: absolute;
-            inset: 0; /* top:0;right:0;bottom:0;left:0; */
-            pointer-events: none;
+            inset: 0;
             z-index: 0;
         }
 
@@ -46,7 +56,6 @@
             width: clamp(220px, 40vw, 600px);
             height: clamp(220px, 40vw, 600px);
             background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
-            pointer-events: none;
             z-index: 0;
             animation: pulse 4s ease-in-out infinite;
             border-radius: 50%;
@@ -54,7 +63,6 @@
 
         @keyframes pulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.5}50%{transform:translate(-50%,-50%) scale(1.15);opacity:.85} }
 
-        /* small-screen polish */
         @media (max-width: 420px) {
             .glow { opacity: .9; }
         }
@@ -67,11 +75,9 @@
 
     <script>
     (function(){
-        // Elements
         const c = document.getElementById('c');
         const starsContainer = document.getElementById('stars');
 
-        // Options (will be adapted on resize)
         const baseOpts = {
             strings: ['HAPPY', 'BIRTHDAY!', 'MRS Sara'],
             charSize: 40,
@@ -116,7 +122,6 @@
         let calc = { totalWidth: 0 };
         let letters = [];
 
-        // Utility: responsive scale
         function adaptForSize() {
             const width = window.innerWidth;
 
@@ -137,13 +142,11 @@
                 opts.fireworkCircleBaseSize = 26;
                 starsCount = 80;
             } else {
-                // desktop
                 opts = Object.assign({}, baseOpts, { strings: baseOpts.strings });
                 starsCount = 100;
             }
         }
 
-        // Stars creation (rebuild on resize)
         let starsCount = 100;
         function createStars(count){
             starsContainer.innerHTML = '';
@@ -164,34 +167,27 @@
             starsContainer.appendChild(frag);
         }
 
-        // Canvas DPR-safe resize
         function resize() {
             dpr = Math.max(1, window.devicePixelRatio || 1);
             w = Math.max(300, Math.floor(window.innerWidth));
             h = Math.max(300, Math.floor(window.innerHeight));
             hw = w / 2; hh = h / 2;
 
-            // adapt options for screen size
             adaptForSize();
 
-            // set physical pixels
             c.width = Math.floor(w * dpr);
             c.height = Math.floor(h * dpr);
             c.style.width = w + 'px';
             c.style.height = h + 'px';
 
-            // reset transform and scale to dpr so drawing uses CSS px coords
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-            // font uses opts.charSize (CSS pixels)
             ctx.font = 'bold ' + opts.charSize + 'px "Playfair Display", serif';
 
-            // rebuild letters and stars
             createLetters();
             createStars(starsCount);
         }
 
-        // Letter class (slightly refactored for clarity)
         function Letter(char, x, y) {
             this.char = char;
             this.x = x;
@@ -218,7 +214,6 @@
         }
 
         Letter.prototype.step = function() {
-            // same logic as original, but using ctx.save / restore when drawing complex shadows
             if (this.phase === 'firework') {
                 if (!this.spawned) {
                     ++this.tick;
@@ -381,17 +376,14 @@
             ctx.bezierCurveTo(x + size / 4, y - size, x + size / 2, y - size / 2, x, y);
         }
 
-        // Build letters array based on current opts and canvas center
         function createLetters(){
             letters = [];
-            // compute calc.totalWidth based on largest string
             const longest = Math.max(...opts.strings.map(s => s.length));
             calc.totalWidth = opts.charSpacing * longest;
 
             for (let i = 0; i < opts.strings.length; ++i) {
                 const s = opts.strings[i];
                 for (let j = 0; j < s.length; ++j) {
-                    // center each string horizontally around 0
                     const x = (j - (s.length - 1)/2) * opts.charSpacing;
                     const y = (i - (opts.strings.length - 1)/2) * opts.lineHeight;
                     letters.push(new Letter(s[j], x, y));
@@ -399,11 +391,9 @@
             }
         }
 
-        // Animation loop
         function anim() {
             window.requestAnimationFrame(anim);
 
-            // subtle trail: fill with transparent black
             ctx.save();
             ctx.fillStyle = 'rgba(0,0,0,0.12)';
             ctx.fillRect(0, 0, w, h);
@@ -425,14 +415,11 @@
             }
         }
 
-        // initialize
         function init() {
             ctx = c.getContext('2d');
             resize();
             anim();
-            // ensure stars & canvas adapt to viewport changes
             window.addEventListener('resize', function(){ resize(); });
-            // respond to orientation change on mobile faster
             window.addEventListener('orientationchange', function(){ setTimeout(resize, 150); });
         }
 
