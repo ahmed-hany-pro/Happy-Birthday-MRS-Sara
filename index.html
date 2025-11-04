@@ -133,11 +133,11 @@
                 opts.balloonBaseSize = 22;
                 opts.balloonAddedSize = 12;
                 opts.fireworkCircleBaseSize = 20;
-                opts.fireworkPrevPoints = 15;
-                opts.fireworkBaseShards = 5;
-                opts.fireworkAddedShards = 3;
-                opts.fireworkShardPrevPoints = 6;
-                starsCount = 40;
+                opts.fireworkPrevPoints = 12;
+                opts.fireworkBaseShards = 4;
+                opts.fireworkAddedShards = 2;
+                opts.fireworkShardPrevPoints = 5;
+                starsCount = 25;
             } else if (width <= 768) {
                 opts.charSize = 36;
                 opts.charSpacing = 40;
@@ -145,11 +145,11 @@
                 opts.balloonBaseSize = 26;
                 opts.balloonAddedSize = 14;
                 opts.fireworkCircleBaseSize = 26;
-                opts.fireworkPrevPoints = 20;
-                opts.fireworkBaseShards = 6;
-                opts.fireworkAddedShards = 4;
-                opts.fireworkShardPrevPoints = 8;
-                starsCount = 60;
+                opts.fireworkPrevPoints = 18;
+                opts.fireworkBaseShards = 5;
+                opts.fireworkAddedShards = 3;
+                opts.fireworkShardPrevPoints = 7;
+                starsCount = 40;
             } else {
                 opts = Object.assign({}, baseOpts, { strings: baseOpts.strings });
                 starsCount = 100;
@@ -177,7 +177,7 @@
         }
 
         function resize() {
-            dpr = isMobile ? 1 : Math.min(2, window.devicePixelRatio || 1);
+            dpr = isMobile ? 1 : 1.5;
             w = Math.max(300, Math.floor(window.innerWidth));
             h = Math.max(300, Math.floor(window.innerHeight));
             hw = w / 2; hh = h / 2;
@@ -237,27 +237,16 @@
                     this.prevPoints.push([x, y, linearProportion * this.lineWidth]);
 
                     const lineWidthProportion = 1 / (this.prevPoints.length - 1 || 1);
+                    const step = isMobile ? 2 : 1;
 
-                    for (let i = 1; i < this.prevPoints.length; ++i) {
-                        const point = this.prevPoints[i], point2 = this.prevPoints[i - 1];
+                    for (let i = step; i < this.prevPoints.length; i += step) {
+                        const point = this.prevPoints[i], point2 = this.prevPoints[i - step];
                         ctx.strokeStyle = this.alphaColor.replace('alp', (i / this.prevPoints.length).toString());
                         ctx.lineWidth = point[2] * lineWidthProportion * i;
                         ctx.beginPath();
                         ctx.moveTo(point[0], point[1]);
                         ctx.lineTo(point2[0], point2[1]);
                         ctx.stroke();
-                    }
-
-                    if (!isMobile && this.prevPoints.length > 2) {
-                        const point = this.prevPoints[this.prevPoints.length - 1];
-                        ctx.save();
-                        ctx.shadowBlur = 10;
-                        ctx.shadowColor = this.color;
-                        ctx.beginPath();
-                        ctx.arc(point[0], point[1], 2, 0, Math.PI * 2);
-                        ctx.fillStyle = this.color;
-                        ctx.fill();
-                        ctx.restore();
                     }
 
                     if (this.tick >= this.reachTime) {
@@ -292,26 +281,10 @@
                     ctx.arc(this.x, this.y, armonic * this.circleFinalSize, 0, Math.PI * 2);
                     ctx.fill();
 
-                    if (!isMobile) {
-                        ctx.save();
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = this.color;
-                        ctx.fill();
-                        ctx.restore();
-                    }
-
                     if (this.tick2 > this.circleCompleteTime) { this.tick2 = 0; this.circleCreating = false; this.circleFading = true; }
                 } else if (this.circleFading) {
                     ctx.fillStyle = this.lightColor.replace('light', '95');
                     ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
-                    
-                    if (!isMobile) {
-                        ctx.save();
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = this.color;
-                        ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
-                        ctx.restore();
-                    }
 
                     ++this.tick2;
                     const proportion = this.tick2 / this.circleFadeTime;
@@ -325,14 +298,6 @@
                 } else {
                     ctx.fillStyle = this.lightColor.replace('light', '95');
                     ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
-                    
-                    if (!isMobile) {
-                        ctx.save();
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = this.color;
-                        ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
-                        ctx.restore();
-                    }
                 }
 
                 for (let i = 0; i < this.shards.length; ++i) {
@@ -354,14 +319,6 @@
                     ++this.tick;
                     ctx.fillStyle = this.lightColor.replace('light', '95');
                     ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
-                    
-                    if (!isMobile) {
-                        ctx.save();
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = this.color;
-                        ctx.fillText(this.char, this.x + this.dx, this.y + this.dy);
-                        ctx.restore();
-                    }
 
                     if (this.tick >= this.spawnTime) { this.tick = 0; this.spawning = false; this.inflating = true; }
                 } else if (this.inflating) {
@@ -371,14 +328,6 @@
 
                     ctx.fillStyle = this.alphaColor.replace('alp', proportion);
                     ctx.beginPath(); generateBalloonPath(x, y, this.size * proportion); ctx.fill();
-                    
-                    if (!isMobile) {
-                        ctx.save();
-                        ctx.shadowBlur = 10;
-                        ctx.shadowColor = this.color;
-                        ctx.fill();
-                        ctx.restore();
-                    }
 
                     ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, this.y); ctx.stroke();
 
@@ -391,14 +340,6 @@
 
                     ctx.fillStyle = this.color;
                     ctx.beginPath(); generateBalloonPath(this.cx, this.cy, this.size); ctx.fill();
-                    
-                    if (!isMobile) {
-                        ctx.save();
-                        ctx.shadowBlur = 15;
-                        ctx.shadowColor = this.color;
-                        ctx.fill();
-                        ctx.restore();
-                    }
 
                     ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(this.cx, this.cy); ctx.lineTo(this.cx, this.cy + this.size); ctx.stroke();
 
@@ -420,8 +361,9 @@
             if (this.prevPoints.length > opts.fireworkShardPrevPoints) this.prevPoints.shift();
             this.prevPoints.push([this.x, this.y]);
             const lineWidthProportion = this.size / (this.prevPoints.length || 1);
-            for (let k = 0; k < this.prevPoints.length - 1; ++k) {
-                const point = this.prevPoints[k], point2 = this.prevPoints[k+1];
+            const step = isMobile ? 2 : 1;
+            for (let k = 0; k < this.prevPoints.length - 1; k += step) {
+                const point = this.prevPoints[k], point2 = this.prevPoints[k+step] || this.prevPoints[this.prevPoints.length - 1];
                 ctx.strokeStyle = this.color.replace('alp', (k / this.prevPoints.length).toString());
                 ctx.lineWidth = k * lineWidthProportion;
                 ctx.beginPath(); ctx.moveTo(point[0], point[1]); ctx.lineTo(point2[0], point2[1]); ctx.stroke();
@@ -473,10 +415,15 @@
         }
 
         function init() {
-            ctx = c.getContext('2d', { alpha: false });
+            ctx = c.getContext('2d', { alpha: false, desynchronized: true });
             resize();
             anim();
-            window.addEventListener('resize', function(){ resize(); });
+            
+            let resizeTimeout;
+            window.addEventListener('resize', function(){ 
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(resize, 200);
+            });
             window.addEventListener('orientationchange', function(){ setTimeout(resize, 150); });
         }
 
